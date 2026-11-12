@@ -2,7 +2,7 @@ import { expect, mock, test } from 'claude-code/testing'
 
 import {
   cleanLine,
-  defangFileLinks,
+  defangLinks,
   diffRowOf,
   diffRows,
   diffWindow,
@@ -773,10 +773,35 @@ test('preview: lines cleaned, windows of source, Markdown and diffs, PNG sizes',
     ['<a href="file:///a">x</a>', '<a href="nofile:///a">x</a>'],
     ['![x](file:///a) <file:///b>', '![x](nofile:///a) <nofile:///b>'],
   ]
-  for (const [written, drawn] of disarmed) expect(defangFileLinks(written)).toBe(drawn)
-  // Everything else stays as written.
-  for (const kept of ['[x](https://example.com/file:1)', '[x](files/a.md) and [y](profile:1)', 'a file: here, <b>bold</b>', '[x](nofile:///a)'])
-    expect(defangFileLinks(kept)).toBe(kept)
+  for (const [written, drawn] of disarmed) expect(defangLinks(written)).toBe(drawn)
+
+  // So is every other scheme but the web's and mail's, where the target is plainly a link's.
+  const others: [string, string][] = [
+    ['[x](javascript:alert(1))', '[x](nojavascript:alert(1))'],
+    ['[x](&#106;avascript&colon;alert(1))', '[x](no&#106;avascript&colon;alert(1))'],
+    ['[x](VSCode://file/a)', '[x](noVSCode://file/a)'],
+    ['[x](<smb: //host/share>)', '[x](<nosmb: //host/share>)'],
+    ['[r]: data:text/html,x', '[r]: nodata:text/html,x'],
+    ['<a href="tel:123">x</a>', '<a href="notel:123">x</a>'],
+    ['<a href="java\tscript:alert(1)">x</a>', '<a href="nojava\tscript:alert(1)">x</a>'],
+    ['see <slack://open> and <ssh://host>', 'see <noslack://open> and <nossh://host>'],
+    ['[y](profile:1)', '[y](noprofile:1)'],
+  ]
+  for (const [written, drawn] of others) expect(defangLinks(written)).toBe(drawn)
+
+  // Links to the web and to mail stay links, and what only looks like a target stays as written: paths, a
+  // drive, code with a colon in it.
+  const kept = [
+    '[x](https://example.com/file:1) <http://example.com> [m](MAILTO:a@example.com)',
+    '[x](files/a.md) [y](#top) [z](../b.md?c=d) [w](C:/x)',
+    'a file: here, <b>bold</b> and <user@example.com>',
+    'func f<Element: Equatable>(x: Element) and fn g<T: Display>()',
+    'std::vector<std::string> v; calls[i](std::move(x)); <xs:element name="a"> <Key:Hashable>',
+    'calls[i](value: 3) and if seen[key]: return',
+    'cat <<EOF\nname: demo\nurl:x\nEOF',
+    'a < b and c:d',
+  ]
+  for (const text of kept) expect(defangLinks(text)).toBe(text)
 
   // A cut hunk gets a header counting only the lines it keeps.
   const hunks = parseDiff(

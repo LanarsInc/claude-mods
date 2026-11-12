@@ -30,7 +30,8 @@ beside the transcript and shows:
 - a preview under the tree of the file under the cursor: source with syntax colours and line numbers, a
   changed file's `git diff HEAD` changes (`d` switches to the whole file), both with long lines wrapped onto
   the rows below, Markdown rendered, and PNG pictures in the terminal. Folders, binary files, files over 2 MB and files that usually hold secrets (`.env`, private
-  keys) get a one-line note instead, and `file:` links in a previewed Markdown file are not clickable. It
+  keys) get a one-line note instead, and in a previewed Markdown file only links to the web and to mail
+  stay links: `file:` and any other scheme draw as plain text. It
   needs 12 free rows in the pane; the tree keeps about 45% of them
 - the selected file, which goes to Claude with your next prompt as context ("what changed in it?")
 

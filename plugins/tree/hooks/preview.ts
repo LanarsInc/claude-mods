@@ -83,15 +83,33 @@ const TARGET = /\]\(|\]:|<|href\s*=/gi
 const REFERENCE = /&(?:#x([0-9a-f]+);?|#(\d+);?|(colon|tab|newline);)/iy
 const NAMED: Record<string, string> = { colon: ':', tab: '\t', newline: '\n' }
 
-// Where the target starting at `from` begins, when it reads `file:` as a parser would decode it (backslash
-// escapes dropped, character references decoded, whitespace and control characters ignored, an opening `<`
-// or quote passed, any case); else -1.
-function fileTarget(text: string, from: number): number {
+// The schemes a previewed file's links may keep: the web and mail.
+const LINKS = new Set(['http', 'https', 'mailto'])
+// The longest scheme read: a parser takes no more for one.
+const SCHEME_MAX = 32
+
+// Where the target starting at `from` begins, when it reads as a URL a preview must not leave as a link, as a
+// parser would decode it (backslash escapes dropped, character references decoded, an opening `<` or quote
+// passed, any case); else -1.
+//
+// `file:` counts however it is written, whitespace and control characters inside it ignored, since opening
+// one could run a program. Any other scheme outside LINKS counts where it is plainly a link's target:
+// - of two letters or more (`C:` is a drive and `<T: Display>` a generic), with something after its colon
+//   that is not a second colon (`std::move` is a name);
+// - in `<>` or quotes, with whatever whitespace inside; else in one piece, and with no space after the colon,
+//   which would end the target (`calls[i](value: 3)` is a call);
+// - after a bare `<` (`isBare`), only as `<scheme://`: `<std::string>`, `<xs:element>` and `<Key:Hashable>`
+//   are code far more often than links.
+function unsafeTarget(text: string, from: number, isBare: boolean): number {
   let at = from
   let start = -1
-  let read = ''
+  let scheme = ''
   let opened = false
-  while (at < text.length && read.length < 5) {
+  // Whitespace or a control character before the scheme, and inside it.
+  let isLed = false
+  let isSplit = false
+  let isEnded = false
+  while (at < text.length && scheme.length <= SCHEME_MAX) {
     let c = text[at] ?? ''
     let width = 1
     if (c === '\\') {
@@ -108,6 +126,8 @@ function fileTarget(text: string, from: number): number {
       }
     }
     if (c <= ' ') {
+      if (start < 0) isLed = true
+      else isSplit = true
       at += width
       continue
     }
@@ -117,22 +137,36 @@ function fileTarget(text: string, from: number): number {
       continue
     }
     if (start < 0) start = at
-    read += c.toLowerCase()
     at += width
+    if (c === ':') {
+      isEnded = true
+      break
+    }
+    c = c.toLowerCase()
+    if (!(scheme ? /[a-z0-9+.-]/ : /[a-z]/).test(c)) return -1
+    scheme += c
   }
-  return read === 'file:' ? start : -1
+  if (!isEnded || !scheme) return -1
+  if (scheme === 'file') return start
+  if (LINKS.has(scheme) || scheme.length < 2) return -1
+  const rest = text.slice(at, at + 2)
+  if (isBare) return !opened && !isLed && !isSplit && rest === '//' ? start : -1
+  const next = rest[0]
+  if (next === undefined || next === ':') return -1
+  return opened || (!isSplit && next > ' ') ? start : -1
 }
 
-// Markdown whose `file:` links draw as plain text, since opening one could run a program: each target that
-// reads `file:`, however it is written (`file\:`, `&#102;ile:`, `< file:`), gets `no` before it, and a link
-// with the scheme `nofile` is never clickable. A target in a code block gets it too: what counts as code is
-// the renderer's to say, and too many disarmed is the safe side.
-export function defangFileLinks(text: string): string {
+// Markdown in which only links to the web and to mail stay links. Any other target that reads as a URL gets
+// `no` before its scheme, and a link with the scheme `nofile` or `novscode` is never clickable: `file:` first
+// of all, since opening one could run a program, however it is written (`file\:`, `&#102;ile:`, `< file:`),
+// and with it every scheme an app may answer to (unsafeTarget). A target in a code block gets it too: what
+// counts as code is the renderer's to say, and too many disarmed is the safe side.
+export function defangLinks(text: string): string {
   let out = ''
   let done = 0
   let last = -1
   for (const match of text.matchAll(TARGET)) {
-    const start = fileTarget(text, (match.index ?? 0) + match[0].length)
+    const start = unsafeTarget(text, (match.index ?? 0) + match[0].length, match[0] === '<')
     if (start < 0 || start === last) continue
     out += `${text.slice(done, start)}no`
     done = last = start
@@ -141,7 +175,7 @@ export function defangFileLinks(text: string): string {
 }
 
 // Markdown from line `scroll` on. A window that starts inside a fenced code block opens it again, so the rest
-// still draws as code; a `file:` link becomes plain text (defangFileLinks).
+// still draws as code; a link that leads anywhere but the web or mail becomes plain text (defangLinks).
 export function markdownWindow(lines: readonly string[], scroll: number, height: number): string {
   let fence: { marker: string; line: string } | null = null
   for (const line of lines.slice(0, scroll)) {
@@ -151,7 +185,7 @@ export function markdownWindow(lines: readonly string[], scroll: number, height:
     else if (marker[0] === fence.marker[0] && marker.length >= fence.marker.length && line.trim() === marker) fence = null
   }
   const shown = lines.slice(scroll, scroll + height)
-  return defangFileLinks(
+  return defangLinks(
     (fence ? [fence.line, ...shown] : shown).map(line => cleanLine(line, widest(height + 1))).join('\n'),
   )
 }
