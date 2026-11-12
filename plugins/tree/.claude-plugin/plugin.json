@@ -1,0 +1,19 @@
+{
+  "name": "tree",
+  "version": "0.1.0",
+  "description": "A file tree pane: git status per file, and the files Claude changes light up as it works",
+  "types": "./types/index.d.ts",
+  "author": {
+    "name": "Alexey Podolian"
+  },
+  "keywords": ["file-tree", "git", "mod", "pane"],
+  "userConfig": {
+    "follow": {
+      "type": "string",
+      "title": "Follow Claude",
+      "description": "on: folders open, and the tree and its preview move to the files Claude changes. off: the tree stays as you left it",
+      "default": "on",
+      "options": ["on", "off"]
+    }
+  }
+}
