@@ -1,5 +1,7 @@
 # tree
 
+<img width="627" height="624" alt="Screenshot 2026-11-12 at 17 56 20" src="https://github.com/user-attachments/assets/acac2cf5-73ad-4fe7-8079-6cece24ed07a" />
+
 Our own file tree for Claude Code, written from scratch as a mod (a plugin of function hooks). It docks
 beside the transcript and shows:
 
