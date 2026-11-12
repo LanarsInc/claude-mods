@@ -1,0 +1,6 @@
+{
+  "name": "usage-pace",
+  "version": "0.1.0",
+  "description": "Session and weekly usage above the prompt, with a daily budget that lasts the week, paced over 7 days or 5 workdays",
+  "types": "./types/index.d.ts"
+}

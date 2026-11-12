@@ -1,0 +1,6 @@
+{
+  "name": "lanars",
+  "owner": { "name": "LanarsInc" },
+  "description": "Claude Code mods from LANARS",
+  "plugins": [{ "name": "usage-pace", "source": "./plugins/usage-pace" }]
+}
