@@ -85,31 +85,35 @@ const NAMED: Record<string, string> = { colon: ':', tab: '\t', newline: '\n' }
 
 // The schemes a previewed file's links may keep: the web and mail.
 const LINKS = new Set(['http', 'https', 'mailto'])
-// The longest scheme read: a parser takes no more for one.
-const SCHEME_MAX = 32
+// Put before a target to disarm it. No scheme starts with it, so what follows is a URL to nowhere whatever
+// its letters are; a prefix of letters could spell a real scheme (`no` before `tion:` is `notion:`).
+const DISARM = '_'
 
 // Where the target starting at `from` begins, when it reads as a URL a preview must not leave as a link, as a
 // parser would decode it (backslash escapes dropped, character references decoded, an opening `<` or quote
 // passed, any case); else -1.
 //
 // `file:` counts however it is written, whitespace and control characters inside it ignored, since opening
-// one could run a program. Any other scheme outside LINKS counts where it is plainly a link's target:
-// - of two letters or more (`C:` is a drive and `<T: Display>` a generic), with something after its colon
-//   that is not a second colon (`std::move` is a name);
-// - in `<>` or quotes, with whatever whitespace inside; else in one piece, and with no space after the colon,
-//   which would end the target (`calls[i](value: 3)` is a call);
-// - after a bare `<` (`isBare`), only as `<scheme://`: `<std::string>`, `<xs:element>` and `<Key:Hashable>`
-//   are code far more often than links.
+// one could run a program. Any other scheme outside LINKS, of any length (an app's own can be long), counts
+// where it is a link's target and not code that looks like one:
+// - of two letters or more (`C:` is a drive and `<T: Display>` a generic), and with no second colon after its
+//   own (`std::move` and `<std::string>` are names);
+// - in `<>` or quotes, with whatever whitespace inside; else in one piece, and with something right after the
+//   colon, since a space ends such a target (`calls[i](value: 3)` is a call). A tab or a line ending written
+//   as a character reference does not break the piece: it reaches the URL, whose parser drops it;
+// - after a bare `<` (`isBare`), as an autolink is written: the scheme at once, and no space or `<` before
+//   the `>` (`<Element: Equatable>` and `<xs:element name="a">` are code). `<Key:Hashable>` and `<xs:all>`
+//   read as autolinks and are disarmed, as a renderer would link them outside a code block.
 function unsafeTarget(text: string, from: number, isBare: boolean): number {
   let at = from
   let start = -1
   let scheme = ''
   let opened = false
-  // Whitespace or a control character before the scheme, and inside it.
+  // Whitespace or a control character before the scheme, and one inside it that a URL would keep.
   let isLed = false
   let isSplit = false
   let isEnded = false
-  while (at < text.length && scheme.length <= SCHEME_MAX) {
+  while (at < text.length) {
     let c = text[at] ?? ''
     let width = 1
     if (c === '\\') {
@@ -126,8 +130,9 @@ function unsafeTarget(text: string, from: number, isBare: boolean): number {
       }
     }
     if (c <= ' ') {
+      const isDropped = width > 1 && (c === '\t' || c === '\n' || c === '\r')
       if (start < 0) isLed = true
-      else isSplit = true
+      else if (!isDropped) isSplit = true
       at += width
       continue
     }
@@ -148,19 +153,26 @@ function unsafeTarget(text: string, from: number, isBare: boolean): number {
   }
   if (!isEnded || !scheme) return -1
   if (scheme === 'file') return start
-  if (LINKS.has(scheme) || scheme.length < 2) return -1
-  const rest = text.slice(at, at + 2)
-  if (isBare) return !opened && !isLed && !isSplit && rest === '//' ? start : -1
-  const next = rest[0]
-  if (next === undefined || next === ':') return -1
+  if (LINKS.has(scheme) || scheme.length < 2 || text[at] === ':') return -1
+  if (isBare) {
+    if (opened || isLed || isSplit) return -1
+    for (let i = at; i < text.length; i++) {
+      const body = text[i] ?? ''
+      if (body === '>') return start
+      if (body <= ' ' || body === '<') return -1
+    }
+    return -1
+  }
+  const next = text[at]
+  if (next === undefined) return -1
   return opened || (!isSplit && next > ' ') ? start : -1
 }
 
 // Markdown in which only links to the web and to mail stay links. Any other target that reads as a URL gets
-// `no` before its scheme, and a link with the scheme `nofile` or `novscode` is never clickable: `file:` first
-// of all, since opening one could run a program, however it is written (`file\:`, `&#102;ile:`, `< file:`),
-// and with it every scheme an app may answer to (unsafeTarget). A target in a code block gets it too: what
-// counts as code is the renderer's to say, and too many disarmed is the safe side.
+// DISARM before its scheme, after which it names no scheme at all: `file:` first of all, since opening one
+// could run a program, however it is written (`file\:`, `&#102;ile:`, `< file:`), and with it every scheme
+// an app may answer to (unsafeTarget). A target in a code block gets it too: what counts as code is the
+// renderer's to say, and too many disarmed is the safe side.
 export function defangLinks(text: string): string {
   let out = ''
   let done = 0
@@ -168,7 +180,7 @@ export function defangLinks(text: string): string {
   for (const match of text.matchAll(TARGET)) {
     const start = unsafeTarget(text, (match.index ?? 0) + match[0].length, match[0] === '<')
     if (start < 0 || start === last) continue
-    out += `${text.slice(done, start)}no`
+    out += text.slice(done, start) + DISARM
     done = last = start
   }
   return out + text.slice(done)

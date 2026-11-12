@@ -786,36 +786,50 @@ test('preview: lines cleaned, windows of source, Markdown and diffs, PNG sizes',
 
   // A window inside a fenced block opens it again; a file: link stops being a link.
   const md = ['# T', '```ts', 'const a = 1', 'const b = 2', '```', 'see [x](file:///etc/passwd) and <file:///tmp>']
-  expect(markdownWindow(md, 3, 3)).toBe('```ts\nconst b = 2\n```\nsee [x](nofile:///etc/passwd) and <nofile:///tmp>')
-  expect(markdownWindow(md, 5, 3)).toBe('see [x](nofile:///etc/passwd) and <nofile:///tmp>')
+  expect(markdownWindow(md, 3, 3)).toBe('```ts\nconst b = 2\n```\nsee [x](_file:///etc/passwd) and <_file:///tmp>')
+  expect(markdownWindow(md, 5, 3)).toBe('see [x](_file:///etc/passwd) and <_file:///tmp>')
 
   // A file: link is disarmed however its target is written: an escaped colon, character references, space
-  // or a tab inside angle brackets, on the next line, any case, in a definition or in raw HTML.
+  // or a tab inside angle brackets, on the next line, any case, in a definition or in raw HTML. What disarms
+  // it is a `_` before the scheme, which no scheme can start with.
   const disarmed: [string, string][] = [
-    ['[x](file\\:///a)', '[x](nofile\\:///a)'],
-    ['[x](&#102;ile:///a)', '[x](no&#102;ile:///a)'],
-    ['[x](file&colon;///a)', '[x](nofile&colon;///a)'],
-    ['[x](&#x46;ILE&#58;///a)', '[x](no&#x46;ILE&#58;///a)'],
-    ['[x](< file:///a>)', '[x](< nofile:///a>)'],
-    ['[x](<fi\tle:///a>)', '[x](<nofi\tle:///a>)'],
-    ['[x](\n  file:///a)', '[x](\n  nofile:///a)'],
-    ['[r]: <FILE:///a> "t"', '[r]: <noFILE:///a> "t"'],
-    ['<a href="file:///a">x</a>', '<a href="nofile:///a">x</a>'],
-    ['![x](file:///a) <file:///b>', '![x](nofile:///a) <nofile:///b>'],
+    ['[x](file\\:///a)', '[x](_file\\:///a)'],
+    ['[x](&#102;ile:///a)', '[x](_&#102;ile:///a)'],
+    ['[x](file&colon;///a)', '[x](_file&colon;///a)'],
+    ['[x](&#x46;ILE&#58;///a)', '[x](_&#x46;ILE&#58;///a)'],
+    ['[x](< file:///a>)', '[x](< _file:///a>)'],
+    ['[x](<fi\tle:///a>)', '[x](<_fi\tle:///a>)'],
+    ['[x](\n  file:///a)', '[x](\n  _file:///a)'],
+    ['[r]: <FILE:///a> "t"', '[r]: <_FILE:///a> "t"'],
+    ['<a href="file:///a">x</a>', '<a href="_file:///a">x</a>'],
+    ['![x](file:///a) <file:///b>', '![x](_file:///a) <_file:///b>'],
   ]
   for (const [written, drawn] of disarmed) expect(defangLinks(written)).toBe(drawn)
 
-  // So is every other scheme but the web's and mail's, where the target is plainly a link's.
+  // So is every other scheme but the web's and mail's, where the target is a link's.
   const others: [string, string][] = [
-    ['[x](javascript:alert(1))', '[x](nojavascript:alert(1))'],
-    ['[x](&#106;avascript&colon;alert(1))', '[x](no&#106;avascript&colon;alert(1))'],
-    ['[x](VSCode://file/a)', '[x](noVSCode://file/a)'],
-    ['[x](<smb: //host/share>)', '[x](<nosmb: //host/share>)'],
-    ['[r]: data:text/html,x', '[r]: nodata:text/html,x'],
-    ['<a href="tel:123">x</a>', '<a href="notel:123">x</a>'],
-    ['<a href="java\tscript:alert(1)">x</a>', '<a href="nojava\tscript:alert(1)">x</a>'],
-    ['see <slack://open> and <ssh://host>', 'see <noslack://open> and <nossh://host>'],
-    ['[y](profile:1)', '[y](noprofile:1)'],
+    ['[x](javascript:alert(1))', '[x](_javascript:alert(1))'],
+    ['[x](&#106;avascript&colon;alert(1))', '[x](_&#106;avascript&colon;alert(1))'],
+    ['[x](VSCode://file/a)', '[x](_VSCode://file/a)'],
+    ['[x](<smb: //host/share>)', '[x](<_smb: //host/share>)'],
+    ['[r]: data:text/html,x', '[r]: _data:text/html,x'],
+    ['<a href="tel:123">x</a>', '<a href="_tel:123">x</a>'],
+    ['<a href="java\tscript:alert(1)">x</a>', '<a href="_java\tscript:alert(1)">x</a>'],
+    ['[y](profile:1)', '[y](_profile:1)'],
+    // An autolink, with or without `//` after the scheme.
+    ['see <slack://open> and <ssh://host>', 'see <_slack://open> and <_ssh://host>'],
+    ['<javascript:alert(1)> and <data:text/html,x>', '<_javascript:alert(1)> and <_data:text/html,x>'],
+    // A tab or a line ending written as a character reference: the URL's parser drops it.
+    ['[x](java&Tab;script:alert(1)) [y](java&#10;script:alert(1))', '[x](_java&Tab;script:alert(1)) [y](_java&#10;script:alert(1))'],
+    // A scheme of any length: an app's own can be long.
+    [
+      '[x](com.googleusercontent.apps.1234567890-abcdefghijklmnopqrstuvwxyz:/oauth)',
+      '[x](_com.googleusercontent.apps.1234567890-abcdefghijklmnopqrstuvwxyz:/oauth)',
+    ],
+    // What is put before it spells no other scheme: not `notion:`.
+    ['[x](tion://www.notion.so/a)', '[x](_tion://www.notion.so/a)'],
+    // Code written as an autolink is, to a renderer outside a code block, one.
+    ['f<Key:Hashable> and <xs:all>', 'f<_Key:Hashable> and <_xs:all>'],
   ]
   for (const [written, drawn] of others) expect(defangLinks(written)).toBe(drawn)
 
@@ -826,10 +840,10 @@ test('preview: lines cleaned, windows of source, Markdown and diffs, PNG sizes',
     '[x](files/a.md) [y](#top) [z](../b.md?c=d) [w](C:/x)',
     'a file: here, <b>bold</b> and <user@example.com>',
     'func f<Element: Equatable>(x: Element) and fn g<T: Display>()',
-    'std::vector<std::string> v; calls[i](std::move(x)); <xs:element name="a"> <Key:Hashable>',
+    'std::vector<std::string> v; calls[i](std::move(x)); <xs:element name="a">',
     'calls[i](value: 3) and if seen[key]: return',
     'cat <<EOF\nname: demo\nurl:x\nEOF',
-    'a < b and c:d',
+    'a < b and c:d, at <12:30>',
   ]
   for (const text of kept) expect(defangLinks(text)).toBe(text)
 
@@ -950,7 +964,7 @@ test('the preview shows the file under the cursor: source, changes, Markdown, a 
   await go({ press: `${ROOT}/README.md` })
   let md = await element(ui, 'Markdown')
   expect(md.props.text).toContain('[docs](https://example.com)')
-  expect(md.props.text).toContain('(nofile:///Applications/Calculator.app)')
+  expect(md.props.text).toContain('(_file:///Applications/Calculator.app)')
 
   // Its long lines wrap too, so the window holds the lines that fit: 13 rows of 50 columns (one of the 14 is
   // kept spare) take the first six lines, and J stops at the window that shows the last one.
