@@ -553,25 +553,53 @@ async function toggleDiff($: EngineInterface): Promise<void> {
 // --- opening files ---
 
 // Files the system would run rather than show when opened: scripts, launchers, installers, link files.
-const RUNS = /\.(app|command|tool|terminal|sh|bash|zsh|fish|csh|ksh|py|pyw|rb|pl|php|js|mjs|cjs|scpt|scptd|applescript|workflow|action|pkg|mpkg|jar|desktop|appimage|run|bin|exe|bat|cmd|ps1|webloc|inetloc|fileloc|url)$/i
+const RUNS = /\.(app|command|tool|terminal|sh|bash|zsh|fish|csh|ksh|py|pyw|rb|pl|php|js|mjs|cjs|scpt|scptd|applescript|workflow|action|pkg|mpkg|jar|jnlp|desktop|appimage|run|bin|exe|bat|cmd|ps1|webloc|inetloc|fileloc|ftploc|afploc|mailloc|vncloc|newsloc|url|rdp)$/i
 
-// True when opening the file could run it: a type above, or any execute bit set. Unknown counts as runnable.
-async function couldRun($: EngineInterface, path: string): Promise<boolean> {
-  if (RUNS.test(path)) return true
+// The types a default app only shows: text, data, source, documents, pictures, sound and video. These alone
+// are opened. No list of what could run is ever whole, so any other type counts as one that might: a
+// launcher, an installer, an archive that unpacks, a page a browser runs scripts from (.html, .svg, .xml).
+const SHOWS = new Set(
+  [
+    'txt text md markdown mdx rst adoc org tex bib log rtf pdf epub docx xlsx pptx',
+    'csv tsv json jsonc json5 jsonl ndjson yaml yml toml ini cfg conf env properties plist lock sql graphql gql proto diff patch',
+    'ts tsx mts cts jsx css scss sass less vue svelte astro go rs java kt kts swift m mm h hh hpp c cc cpp cxx cs fs dart',
+    'scala clj ex exs erl hs lua r jl zig nim sol tf hcl gradle cmake mk',
+    'png jpg jpeg gif webp bmp tif tiff ico heic avif',
+    'mp3 wav flac aac m4a ogg opus mp4 m4v mov webm mkv avi',
+  ].flatMap(types => types.split(' ')),
+)
+
+// A name's type, lower case: what follows its last dot; '' for a name without one (`Makefile`, `.gitignore`).
+function typeOf(path: string): string {
+  const name = nameOf(path).replace(/^\.+/, '')
+  const dot = name.lastIndexOf('.')
+  return dot < 0 ? '' : name.slice(dot + 1).toLowerCase()
+}
+
+// Why a file is not opened, or '' when it may be: it `runs` (a type in RUNS, or any execute bit set, unknown
+// counting as set), or its `type` is none of SHOWS. A name with no type is text unless it can be executed.
+async function refusal($: EngineInterface, path: string): Promise<'' | 'runs' | 'type'> {
+  if (RUNS.test(path)) return 'runs'
+  const type = typeOf(path)
+  if (type && !SHOWS.has(type)) return 'type'
   const argv = (await os($)) === 'darwin' ? ['stat', '-f', '%Lp', path] : ['stat', '-c', '%a', path]
   const run = await $.process.run(argv, { timeoutMs: 3_000 }).catch(() => null)
   const mode = run && run.exitCode === 0 ? parseInt(run.stdout.trim(), 8) : NaN
-  return !Number.isFinite(mode) || (mode & 0o111) !== 0
+  return !Number.isFinite(mode) || (mode & 0o111) !== 0 ? 'runs' : ''
 }
 
-// Opens a file in its default app, never one that would run: on macOS that one is shown in Finder instead.
+// Opens a file in its default app when that app only shows it. One that could run, or of a type not known to
+// be shown, is not opened: on macOS it is shown in Finder instead.
 async function openFile($: EngineInterface, path: string): Promise<void> {
   const system = await os($)
-  if (await couldRun($, path)) {
+  const why = await refusal($, path)
+  if (why) {
+    const name = printable(nameOf(path))
+    const reason = why === 'runs' ? `${name} could run as a program` : `${name} is not a type the tree opens`
     if (system === 'darwin') {
       await $.process.run(['open', '-R', path], { timeoutMs: 10_000 }).catch(() => null)
-      $.ui.toast(`${printable(nameOf(path))} could run as a program, so it is shown in Finder instead`)
-    } else $.ui.toast(`${printable(nameOf(path))} could run as a program, so it was not opened`)
+      $.ui.toast(`${reason}, so it is shown in Finder instead`)
+    } else $.ui.toast(`${reason}, so it was not opened`)
     return
   }
   const run = await $.process.run([system === 'darwin' ? 'open' : 'xdg-open', path], { timeoutMs: 10_000 }).catch(() => null)

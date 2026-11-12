@@ -45,7 +45,7 @@ pane sits above the prompt instead of beside the transcript.
 | `/tree` | opens the pane on the cwd and follows it |
 | `/tree <path>` | pins the pane to that folder |
 | click a folder | opens or closes it |
-| click a file | selects it (click again to unselect); a double click opens it in its default app, or shows it in Finder when it could run as a program (a script, a launcher, anything executable) |
+| click a file | selects it (click again to unselect); a double click opens it in its default app when that app only shows it (text, source, documents, pictures, sound, video); a file that could run as a program (a script, a launcher, anything executable) or is of any other type is shown in Finder instead |
 | wheel | scrolls the tree, or the preview when the pointer is over it |
 | after a click: arrows or `hjkl` | move; right opens, left closes or goes to the parent |
 | a screenshot dragged into the terminal, or a paste, after a click | the prompt takes the keys back: what you type next goes there |

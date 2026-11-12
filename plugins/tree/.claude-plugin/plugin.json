@@ -1,6 +1,6 @@
 {
   "name": "tree",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A file tree pane: git status per file, and the files Claude changes light up as it works",
   "types": "./types/index.d.ts",
   "author": {
