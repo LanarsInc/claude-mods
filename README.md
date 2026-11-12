@@ -4,8 +4,8 @@ Mods for [Claude Code](https://claude.com/claude-code): small plugins that chang
 
 | Mod | What it does |
 |---|---|
-| [usage-pace](plugins/usage-pace) | Shows your plan's session and weekly usage above the prompt, with a daily budget that lasts the week |
-| [tree](plugins/tree) | A file tree pane beside the transcript: git status per file, a preview, and the files Claude changes light up as it works |
+| [usage-pace](plugins/usage-pace) | Shows your plan's session and weekly usage above the prompt, with a daily budget that lasts the week <img width="819" height="98" alt="Screenshot 2026-11-12 at 17 57 20" src="https://github.com/user-attachments/assets/d4708661-820c-4f44-b5f9-34f3e6cf11a7" /> |
+| [tree](plugins/tree) | A file tree pane beside the transcript: git status per file, a preview, and the files Claude changes light up as it works <img width="627" height="624" alt="Screenshot 2026-11-12 at 17 56 20" src="https://github.com/user-attachments/assets/1b2b35e6-934d-4e23-92f0-a943783fc158" />|
 
 ## Install
 
