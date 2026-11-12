@@ -3,6 +3,8 @@
 A Claude Code mod that shows your plan's usage limits just above the prompt and tells you how much
 you can use today and still have some left by the end of the week.
 
+<img width="815" height="75" alt="Screenshot 2026-11-12 at 17 39 35" src="https://github.com/user-attachments/assets/39b41730-5952-44b4-89f1-594870ac7ec9" />
+
 ```
 Session ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━     16% · resets in 4h     ×
 Week     Thu   Fri   Sat   Sun   Mon ▸ Tue   Wed    45% · today 13.6% left 7d 5d
